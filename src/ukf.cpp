@@ -22,7 +22,7 @@ UKF::UKF() {
   x_ = VectorXd(5);
 
   // initial covariance matrix
-  P_ = MatrixXd::Identity(5, 5) * 1e5;
+  P_ = MatrixXd::Identity(5, 5);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
   std_a_ = 30;
@@ -213,7 +213,8 @@ void UKF::Prediction(double delta_t) {
 
 	for (int i = 0; i < n_sig_; ++i)
 	{
-		P_ += weights_(i) * (Xsig_pred_.col(i) - x_) * (Xsig_pred_.col(i) - x_).transpose();
+		VectorXd x_diff = Xsig_pred_.col(i) - x_;
+		P_ += weights_(i) * x_diff * x_diff.transpose();
 	}
 }
 
@@ -222,14 +223,53 @@ void UKF::Prediction(double delta_t) {
  * @param {MeasurementPackage} meas_package
  */
 void UKF::UpdateLidar(MeasurementPackage meas_package) {
-  /**
-  TODO:
+	MatrixXd Zsig = MatrixXd(2, n_sig_);
 
-  Complete this function! Use lidar data to update the belief about the object's
-  position. Modify the state vector, x_, and covariance, P_.
+	// fill prediction sigma points matrix
+	for (int i = 0; i < n_sig_; ++i)
+	{
+		double px = Xsig_pred_(0, i);
+		double py = Xsig_pred_(1, i);
 
-  You'll also need to calculate the lidar NIS.
-  */
+		Zsig.col(i) << px, py;
+	}
+
+	// calculate prediction mean as weighted average of sigma points
+	VectorXd z_pred = VectorXd::Zero(2);
+
+	for (int i = 0; i < n_sig_; ++i)
+	{
+		z_pred += weights_(i) * Zsig.col(i);
+	}
+
+	// calculate Kalman gain
+	MatrixXd S = MatrixXd::Zero(2, 2);
+	MatrixXd R = MatrixXd(2, 2);
+	R << pow(std_laspx_, 2), 0,
+		 0, pow(std_laspy_, 2);
+
+	for (int i = 0; i < n_sig_; ++i)
+	{
+		VectorXd z_diff = Zsig.col(i) - z_pred;
+		S += weights_(i) * z_diff * z_diff.transpose();
+	}
+
+	S += R;
+
+	MatrixXd T = MatrixXd::Zero(5, 2);
+
+	for (int i = 0; i < n_sig_; ++i)
+	{
+		VectorXd x_diff = Xsig_pred_.col(i) - x_;
+		VectorXd z_diff = Zsig.col(i) - z_pred;
+		T += weights_(i) * x_diff * z_diff.transpose();
+	}
+
+	MatrixXd K = T * S.inverse();
+
+	// update state vector and state covariance matrix
+	x_ += K * (meas_package.raw_measurements_ - z_pred);
+	P_ -= K * S * K.transpose();
 }
 
 /**
