@@ -26,7 +26,3 @@ Input data and output data (state estimations and final root mean squared error)
 To run the code, navigate to the `build` directory and execute the following:
 
 `./UnscentedKF ../data/obj_pose-laser-radar-synthetic-input.txt ../data/output.txt`
-
-or
-
-`./UnscentedKF ../data/obj_pose-laser-radar-synthetic-input.txt ../data/output.txt`
