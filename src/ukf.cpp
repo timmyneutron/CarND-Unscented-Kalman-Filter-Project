@@ -57,13 +57,20 @@ UKF::UKF() {
   // lambda coefficient for sigma point generation
   lambda_ = 3 - n_aug_;
 
+  // augmented state matrix
+  x_aug_ = VectorXd(n_aug_);
+
+  // augmented covariance matrix
+  P_aug_ = MatrixXd::Zero(n_aug_, n_aug_);
+  P_aug_(5, 5) = std_a_ * std_a_;
+  P_aug_(6, 6) = std_yawdd_ * std_yawdd_;
+
+  // augmented sigma points matrix
+  Xsig_aug_ = MatrixXd(n_aug_, n_sig_);
+
   // sigma point weights
-  weights_ = VectorXd(n_sig_);
+  weights_ = VectorXd::Constant(n_sig_, 0.5 / (lambda_ + n_aug_));
   weights_(0) = lambda_ / (lambda_ + n_aug_);
-  for (int i = 1; i < n_sig_; ++i)
-  {
-  	weights_(i) = 0.5 / (lambda_ + n_aug_);
-  }
 }
 
 UKF::~UKF() {}
@@ -99,10 +106,11 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 		time_us_ = meas_package.timestamp_;
 
 		is_initialized_ = true;
+
 		return;
 	}
 
-	// define delta t as time since last measurement
+	// define delta_t as time since last measurement (in seconds)
 	double delta_t = (meas_package.timestamp_ - time_us_) / 1e6;
 
 	// reset time_us_ as time of last measurement
@@ -130,23 +138,17 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 void UKF::Prediction(double delta_t) {
 
 	// define augmented P matrix and square root (A) matrix
-	MatrixXd P_aug = MatrixXd::Zero(n_aug_, n_aug_);
-	P_aug.topLeftCorner(n_x_, n_x_) = P_;
-	P_aug(5, 5) = pow(std_a_, 2);
-	P_aug(6, 6) = pow(std_yawdd_, 2);
-	MatrixXd A = P_aug.llt().matrixL();
+	P_aug_.topLeftCorner(n_x_, n_x_) = P_;
+	MatrixXd A = P_aug_.llt().matrixL();
 
 	// generate sigma points
-	MatrixXd Xsig_aug = MatrixXd(n_aug_, n_sig_);
-	VectorXd x_aug = VectorXd(n_aug_);
-
-	x_aug << x_, 0, 0;
-	Xsig_aug.col(0) = x_aug;
+	x_aug_ << x_, 0, 0;
+	Xsig_aug_.col(0) = x_aug_;
 
 	for (int i = 0; i < n_aug_; ++i)
 	{
-		Xsig_aug.col(i+1) = x_aug + sqrt(lambda_ + n_aug_) * A.col(i);
-		Xsig_aug.col(i+n_aug_+1) = x_aug - sqrt(lambda_ + n_aug_) * A.col(i);
+		Xsig_aug_.col(i+1) = x_aug_ + sqrt(lambda_ + n_aug_) * A.col(i);
+		Xsig_aug_.col(i+n_aug_+1) = x_aug_ - sqrt(lambda_ + n_aug_) * A.col(i);
 	}
 
 	// initialize matrix for predicted sigma points
@@ -161,13 +163,13 @@ void UKF::Prediction(double delta_t) {
 	// fill F and nu vectors
 	for (int i = 0; i < n_sig_; ++i)
 	{
-		double px = Xsig_aug(0, i);
-		double py = Xsig_aug(1, i);
-		double v = Xsig_aug(2, i);
-		double psi = Xsig_aug(3, i);
-		double psi_dot = Xsig_aug(4, i);
-		double nu_a = Xsig_aug(5, i);
-		double nu_psi_ddot = Xsig_aug(6, i);
+		double px = Xsig_aug_(0, i);
+		double py = Xsig_aug_(1, i);
+		double v = Xsig_aug_(2, i);
+		double psi = Xsig_aug_(3, i);
+		double psi_dot = Xsig_aug_(4, i);
+		double nu_a = Xsig_aug_(5, i);
+		double nu_psi_ddot = Xsig_aug_(6, i);
 
 		// if psi_dot = 0, use constant velocity model,
 		// otherwise use CTRV model
@@ -195,7 +197,7 @@ void UKF::Prediction(double delta_t) {
 		nu(4) = delta_t * nu_psi_ddot;
 
 		// calculate predicted sigma point based on F and nu vectors
-		Xsig_pred_.col(i) = Xsig_aug.col(i).head(n_x_) + F + nu;
+		Xsig_pred_.col(i) = Xsig_aug_.col(i).head(n_x_) + F + nu;
 	}
 
 	// initialize predicted state vector
@@ -303,6 +305,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 	
 		Zsig.col(i) << rho, phi, rho_dot;
 	}
+	
 	// calculate prediction mean as weighted average of sigma points
 	VectorXd z_pred = VectorXd::Zero(3);
 
