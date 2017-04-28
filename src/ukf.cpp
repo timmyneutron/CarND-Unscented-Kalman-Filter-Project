@@ -71,6 +71,18 @@ UKF::UKF() {
   // sigma point weights
   weights_ = VectorXd::Constant(n_sig_, 0.5 / (lambda_ + n_aug_));
   weights_(0) = lambda_ / (lambda_ + n_aug_);
+
+  // measurement noise covariance matrix for laser
+  R_laser_ = MatrixXd(2, 2);
+  R_laser_ << std_laspx_ * std_laspx_, 0,
+  			  0, std_laspy_ * std_laspy_;
+
+  // measurement noise covariance matrix for radar
+  R_radar_ = MatrixXd(3, 3);
+  R_radar_ << std_radr_ * std_radr_, 0, 0,
+  			  0, std_radphi_ * std_radphi_, 0,
+  			  0, 0, std_radrd_ * std_radrd_;
+
 }
 
 UKF::~UKF() {}
@@ -247,9 +259,6 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
 	// calculate Kalman gain
 	MatrixXd S = MatrixXd::Zero(2, 2);
-	MatrixXd R = MatrixXd(2, 2);
-	R << pow(std_laspx_, 2), 0,
-		 0, pow(std_laspy_, 2);
 
 	for (int i = 0; i < n_sig_; ++i)
 	{
@@ -257,7 +266,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 		S += weights_(i) * z_diff * z_diff.transpose();
 	}
 
-	S += R;
+	S += R_laser_;
 
 	MatrixXd T = MatrixXd::Zero(5, 2);
 
@@ -316,10 +325,6 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
 	// calculate Kalman gain
 	MatrixXd S = MatrixXd::Zero(3, 3);
-	MatrixXd R = MatrixXd(3, 3);
-	R << pow(std_radr_, 2), 0, 0,
-		 0, pow(std_radphi_, 2), 0,
-		 0, 0, pow(std_radrd_, 2);
 
 	for (int i = 0; i < n_sig_; ++i)
 	{
@@ -327,7 +332,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 		S += weights_(i) * z_diff * z_diff.transpose();
 	}
 
-	S += R;
+	S += R_radar_;
 
 	MatrixXd T = MatrixXd::Zero(5, 3);
 

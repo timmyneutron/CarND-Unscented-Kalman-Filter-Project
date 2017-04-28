@@ -64,6 +64,12 @@ public:
   ///* Radar measurement noise standard deviation radius change in m/s
   double std_radrd_ ;
 
+  ///* measurement noise covariance matrix for laser
+  MatrixXd R_laser_;
+
+  ///* measurement noise covariance matrix for radar
+  MatrixXd R_radar_;
+
   ///* Weights of sigma points
   VectorXd weights_;
 
