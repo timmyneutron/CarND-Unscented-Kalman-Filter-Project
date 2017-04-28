@@ -77,6 +77,13 @@ public:
   ///* the current NIS for laser
   double NIS_laser_;
 
+  ///* counts for NIS
+  double NIS_laser_over_;
+  double NIS_laser_total_;
+
+  double NIS_radar_over_;
+  double NIS_radar_total_;
+
   /**
    * Constructor
    */

@@ -25,10 +25,10 @@ UKF::UKF() {
   P_ = MatrixXd::Identity(5, 5);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 30;
+  std_a_ = 3.5;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 30;
+  std_yawdd_ = 1.5;
 
   // Laser measurement noise standard deviation position1 in m
   std_laspx_ = 0.15;
@@ -266,11 +266,16 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 		T += weights_(i) * x_diff * z_diff.transpose();
 	}
 
-	MatrixXd K = T * S.inverse();
+	MatrixXd S_inverse = S.inverse();
+	MatrixXd K = T * S_inverse;
 
 	// update state vector and state covariance matrix
-	x_ += K * (meas_package.raw_measurements_ - z_pred);
+	VectorXd z_meas_diff = meas_package.raw_measurements_ - z_pred;
+	x_ += K * z_meas_diff;
 	P_ -= K * S * K.transpose();
+
+	// calculate normalized innovation squared for lidar
+	NIS_laser_ = z_meas_diff.transpose() * S_inverse * z_meas_diff;
 }
 
 /**
@@ -331,9 +336,14 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 		T += weights_(i) * x_diff * z_diff.transpose();
 	}
 
-	MatrixXd K = T * S.inverse();
+	MatrixXd S_inverse = S.inverse();
+	MatrixXd K = T * S_inverse;
 
 	// update state vector and state covariance matrix
-	x_ += K * (meas_package.raw_measurements_ - z_pred);
+	VectorXd z_meas_diff = meas_package.raw_measurements_ - z_pred;
+	x_ += K * z_meas_diff;
 	P_ -= K * S * K.transpose();
+
+	// calculate normalized innovation squared for radar
+	NIS_radar_ = z_meas_diff.transpose() * S_inverse * z_meas_diff;
 }

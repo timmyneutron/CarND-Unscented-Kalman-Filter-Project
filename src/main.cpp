@@ -222,7 +222,7 @@ int main(int argc, char* argv[]) {
   // compute the accuracy (RMSE)
   Tools tools;
   cout << "RMSE" << endl << tools.CalculateRMSE(estimations, ground_truth) << endl;
-
+  
   // close files
   if (out_file_.is_open()) {
     out_file_.close();
