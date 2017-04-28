@@ -223,9 +223,10 @@ void UKF::Prediction(double delta_t) {
  * @param {MeasurementPackage} meas_package
  */
 void UKF::UpdateLidar(MeasurementPackage meas_package) {
+	
+	// fill prediction sigma points matrix
 	MatrixXd Zsig = MatrixXd(2, n_sig_);
 
-	// fill prediction sigma points matrix
 	for (int i = 0; i < n_sig_; ++i)
 	{
 		double px = Xsig_pred_(0, i);
@@ -277,12 +278,62 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
  * @param {MeasurementPackage} meas_package
  */
 void UKF::UpdateRadar(MeasurementPackage meas_package) {
-  /**
-  TODO:
+	
+	// fill prediction points matrix
+	MatrixXd Zsig = MatrixXd(3, n_sig_);
 
-  Complete this function! Use radar data to update the belief about the object's
-  position. Modify the state vector, x_, and covariance, P_.
+	for (int i = 0; i < n_sig_; ++i)
+	{
+		double px = Xsig_pred_(0, i);
+		double py = Xsig_pred_(1, i);
+		double v = Xsig_pred_(2, i);
+		double psi = Xsig_pred_(3, i);
 
-  You'll also need to calculate the radar NIS.
-  */
+		double vx = v * cos(psi);
+		double vy = v * sin(psi);
+
+		double rho = sqrt(px * px + py * py);
+		double phi = atan2(py, px);
+		double rho_dot = 0.5 / sqrt(px * px + py * py) * (2 * px * vx + 2 * py * vy);
+	
+		Zsig.col(i) << rho, phi, rho_dot;
+	}
+	// calculate prediction mean as weighted average of sigma points
+	VectorXd z_pred = VectorXd::Zero(3);
+
+	for (int i = 0; i < n_sig_; ++i)
+	{
+		z_pred += weights_(i) * Zsig.col(i);
+	}
+
+	// calculate Kalman gain
+	MatrixXd S = MatrixXd::Zero(3, 3);
+	MatrixXd R = MatrixXd(3, 3);
+	R << pow(std_radr_, 2), 0, 0,
+		 0, pow(std_radphi_, 2), 0,
+		 0, 0, pow(std_radrd_, 2);
+
+	for (int i = 0; i < n_sig_; ++i)
+	{
+		VectorXd z_diff = Zsig.col(i) - z_pred;
+		S += weights_(i) * z_diff * z_diff.transpose();
+	}
+
+	S += R;
+
+	MatrixXd T = MatrixXd::Zero(5, 3);
+
+	for (int i = 0; i < n_sig_; ++i)
+	{
+		VectorXd x_diff = Xsig_pred_.col(i) - x_;
+		VectorXd z_diff = Zsig.col(i) - z_pred;
+
+		T += weights_(i) * x_diff * z_diff.transpose();
+	}
+
+	MatrixXd K = T * S.inverse();
+
+	// update state vector and state covariance matrix
+	x_ += K * (meas_package.raw_measurements_ - z_pred);
+	P_ -= K * S * K.transpose();
 }
